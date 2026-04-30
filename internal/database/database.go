@@ -15,7 +15,17 @@ func New(dsn string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := db.AutoMigrate(&model.Article{}); err != nil {
+	err = db.AutoMigrate(
+		&model.Project{},
+		&model.Service{},
+		&model.EnvVar{},
+		&model.Volume{},
+		&model.Deployment{},
+		&model.DeploymentEnvOverride{},
+		&model.Container{},
+		&model.Server{},
+	)
+	if err != nil {
 		return nil, err
 	}
 
