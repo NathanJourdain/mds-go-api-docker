@@ -3,10 +3,11 @@ package handler
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
 	"mds-go-api-docker/internal/model"
 	"mds-go-api-docker/internal/repository"
 	"mds-go-api-docker/internal/service"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 type DeploymentHandler struct {
@@ -51,6 +52,39 @@ func (h *DeploymentHandler) GetByID(c *fiber.Ctx) error {
 			return notFound(c)
 		}
 		return internalError(c)
+	}
+	return c.JSON(deployment)
+}
+
+func (h *DeploymentHandler) Start(c *fiber.Ctx) error {
+	deployment, err := h.svc.StartContainers(c.Context(), c.Params("id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return notFound(c)
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(deployment)
+}
+
+func (h *DeploymentHandler) Stop(c *fiber.Ctx) error {
+	deployment, err := h.svc.StopContainers(c.Context(), c.Params("id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return notFound(c)
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(deployment)
+}
+
+func (h *DeploymentHandler) Restart(c *fiber.Ctx) error {
+	deployment, err := h.svc.RestartContainers(c.Context(), c.Params("id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return notFound(c)
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(deployment)
 }

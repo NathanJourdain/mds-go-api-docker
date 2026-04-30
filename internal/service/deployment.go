@@ -150,6 +150,39 @@ func (s *DeploymentService) GetWithStatusByStr(ctx context.Context, id string) (
 	return deployment, nil
 }
 
+func (s *DeploymentService) StartContainers(ctx context.Context, id string) (*model.Deployment, error) {
+	deployment, err := s.deployRepo.FindByIDStr(id)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range deployment.Containers {
+		s.docker.StartContainer(ctx, c.DockerID) //nolint:errcheck
+	}
+	return s.GetWithStatusByStr(ctx, id)
+}
+
+func (s *DeploymentService) StopContainers(ctx context.Context, id string) (*model.Deployment, error) {
+	deployment, err := s.deployRepo.FindByIDStr(id)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range deployment.Containers {
+		s.docker.StopContainer(ctx, c.DockerID) //nolint:errcheck
+	}
+	return s.GetWithStatusByStr(ctx, id)
+}
+
+func (s *DeploymentService) RestartContainers(ctx context.Context, id string) (*model.Deployment, error) {
+	deployment, err := s.deployRepo.FindByIDStr(id)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range deployment.Containers {
+		s.docker.RestartContainer(ctx, c.DockerID) //nolint:errcheck
+	}
+	return s.GetWithStatusByStr(ctx, id)
+}
+
 func (s *DeploymentService) Stop(ctx context.Context, id string) error {
 	deployment, err := s.deployRepo.FindByIDStr(id)
 	if err != nil {

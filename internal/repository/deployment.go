@@ -80,6 +80,22 @@ func (r *DeploymentRepository) UpdateStartedAt(id uint, t time.Time) error {
 	return r.db.Model(&model.Deployment{}).Where("id = ?", id).Update("started_at", t).Error
 }
 
+func (r *DeploymentRepository) ReplaceEnvOverride(deploymentID uint, overrides []model.DeploymentEnvOverride) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("deployment_id = ?", deploymentID).Delete(&model.DeploymentEnvOverride{}).Error; err != nil {
+			return err
+		}
+		for i := range overrides {
+			overrides[i].ID = 0
+			overrides[i].DeploymentID = deploymentID
+		}
+		if len(overrides) > 0 {
+			return tx.Create(&overrides).Error
+		}
+		return nil
+	})
+}
+
 func (r *DeploymentRepository) Delete(id string) error {
 	var deployment model.Deployment
 	if err := r.db.First(&deployment, id).Error; err != nil {

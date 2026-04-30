@@ -42,6 +42,9 @@ func Setup(app *fiber.App, db *gorm.DB, dockerSvc *service.DockerService) {
 	deployments := api.Group("/deployments")
 	deployments.Get("/:id", hDeployment.GetByID)
 	deployments.Delete("/:id", hDeployment.Delete)
+	deployments.Post("/:id/start", hDeployment.Start)
+	deployments.Post("/:id/stop", hDeployment.Stop)
+	deployments.Post("/:id/restart", hDeployment.Restart)
 
 	docker := api.Group("/docker")
 	docker.Get("/images", hDocker.ListImages)

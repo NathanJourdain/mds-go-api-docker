@@ -106,6 +106,20 @@ func (s *DockerService) ContainerStatus(ctx context.Context, dockerID string) (c
 	return info.State.Status, nil
 }
 
+func (s *DockerService) StartContainer(ctx context.Context, dockerID string) error {
+	return s.cli.ContainerStart(ctx, dockerID, container.StartOptions{})
+}
+
+func (s *DockerService) StopContainer(ctx context.Context, dockerID string) error {
+	timeout := 10
+	return s.cli.ContainerStop(ctx, dockerID, container.StopOptions{Timeout: &timeout})
+}
+
+func (s *DockerService) RestartContainer(ctx context.Context, dockerID string) error {
+	timeout := 10
+	return s.cli.ContainerRestart(ctx, dockerID, container.StopOptions{Timeout: &timeout})
+}
+
 func (s *DockerService) StopAndRemoveContainer(ctx context.Context, dockerID string) error {
 	timeout := 10
 	if err := s.cli.ContainerStop(ctx, dockerID, container.StopOptions{Timeout: &timeout}); err != nil {
