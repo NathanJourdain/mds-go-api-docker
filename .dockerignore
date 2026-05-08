@@ -1,0 +1,6 @@
+tmp/
+app.db
+.env
+.git/
+*.md
+*.pdf

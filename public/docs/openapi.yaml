@@ -1,0 +1,556 @@
+openapi: 3.1.0
+info:
+  title: Docker Manager API
+  version: 1.0.0
+  description: API Go Fiber pour décrire et déployer des infrastructures multi-conteneurs via Docker SDK.
+
+servers:
+  - url: http://localhost:3000/api/v1
+
+tags:
+  - name: projects
+  - name: services
+  - name: volumes
+  - name: deployments
+  - name: docker
+
+paths:
+  /projects:
+    get:
+      tags: [projects]
+      summary: Lister tous les projets
+      responses:
+        "200":
+          description: Liste de projets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      tags: [projects]
+      summary: Créer un projet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Projet créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [projects]
+      summary: Obtenir un projet par ID
+      responses:
+        "200":
+          description: Projet trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [projects]
+      summary: Mettre à jour un projet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectRequest"
+      responses:
+        "200":
+          description: Projet mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [projects]
+      summary: Supprimer un projet
+      responses:
+        "204":
+          description: Projet supprimé
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{id}/services:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [services]
+      summary: Ajouter un service à un projet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequest"
+      responses:
+        "201":
+          description: Service créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+
+  /projects/{id}/services/{sid}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      tags: [services]
+      summary: Mettre à jour un service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceRequest"
+      responses:
+        "200":
+          description: Service mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [services]
+      summary: Supprimer un service
+      responses:
+        "204":
+          description: Service supprimé
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{id}/volumes:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [volumes]
+      summary: Ajouter un volume à un projet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVolumeRequest"
+      responses:
+        "201":
+          description: Volume créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Volume"
+
+  /projects/{id}/volumes/{vid}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: vid
+        in: path
+        required: true
+        schema:
+          type: integer
+    delete:
+      tags: [volumes]
+      summary: Supprimer un volume
+      responses:
+        "204":
+          description: Volume supprimé
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{id}/deployments:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [deployments]
+      summary: Lister les déploiements d'un projet
+      responses:
+        "200":
+          description: Liste de déploiements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Deployment"
+    post:
+      tags: [deployments]
+      summary: Créer un déploiement pour un projet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeploymentRequest"
+      responses:
+        "201":
+          description: Déploiement créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deployment"
+
+  /deployments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [deployments]
+      summary: Obtenir un déploiement par ID
+      responses:
+        "200":
+          description: Déploiement trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deployment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [deployments]
+      summary: Supprimer un déploiement
+      responses:
+        "204":
+          description: Déploiement supprimé
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /deployments/{id}/start:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [deployments]
+      summary: Démarrer un déploiement
+      responses:
+        "200":
+          description: Déploiement démarré
+
+  /deployments/{id}/stop:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [deployments]
+      summary: Arrêter un déploiement
+      responses:
+        "200":
+          description: Déploiement arrêté
+
+  /deployments/{id}/restart:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [deployments]
+      summary: Redémarrer un déploiement
+      responses:
+        "200":
+          description: Déploiement redémarré
+
+  /docker/images:
+    get:
+      tags: [docker]
+      summary: Lister les images Docker
+      responses:
+        "200":
+          description: Liste d'images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /docker/images/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [docker]
+      summary: Obtenir une image Docker par ID
+      responses:
+        "200":
+          description: Image trouvée
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  responses:
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+        description:
+          type: string
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+        volumes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Volume"
+
+    CreateProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        project_id:
+          type: integer
+        name:
+          type: string
+        image:
+          type: string
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortMapping"
+        env_vars:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvVar"
+        volume_mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeMount"
+        depends_on:
+          type: array
+          items:
+            type: string
+
+    CreateServiceRequest:
+      type: object
+      required: [name, image]
+      properties:
+        name:
+          type: string
+        image:
+          type: string
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortMapping"
+        env_vars:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvVar"
+        volume_mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeMount"
+        depends_on:
+          type: array
+          items:
+            type: string
+
+    UpdateServiceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        image:
+          type: string
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortMapping"
+        env_vars:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvVar"
+        volume_mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeMount"
+        depends_on:
+          type: array
+          items:
+            type: string
+
+    PortMapping:
+      type: object
+      properties:
+        host:
+          type: string
+        container:
+          type: string
+        protocol:
+          type: string
+          enum: [tcp, udp]
+
+    EnvVar:
+      type: object
+      properties:
+        id:
+          type: integer
+        service_id:
+          type: integer
+        key:
+          type: string
+        value:
+          type: string
+        is_variable:
+          type: boolean
+
+    VolumeMount:
+      type: object
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+
+    Volume:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        project_id:
+          type: integer
+        name:
+          type: string
+        driver:
+          type: string
+          default: local
+
+    CreateVolumeRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        driver:
+          type: string
+          default: local
+
+    Deployment:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        project_id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+        env_override:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeploymentEnvOverride"
+        containers:
+          type: array
+          items:
+            type: object
+
+    CreateDeploymentRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        env_override:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeploymentEnvOverride"
+
+    DeploymentEnvOverride:
+      type: object
+      properties:
+        id:
+          type: integer
+        deployment_id:
+          type: integer
+        key:
+          type: string
+        value:
+          type: string
