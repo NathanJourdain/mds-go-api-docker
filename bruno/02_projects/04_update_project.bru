@@ -1,0 +1,17 @@
+meta {
+  name: Update project
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/projects/{{projectId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "description": "Description mise à jour"
+  }
+}

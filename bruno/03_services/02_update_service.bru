@@ -1,0 +1,17 @@
+meta {
+  name: Update service
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/projects/{{projectId}}/services/{{serviceId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "image": "nginx:latest"
+  }
+}

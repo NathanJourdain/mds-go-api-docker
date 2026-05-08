@@ -1,0 +1,26 @@
+meta {
+  name: Create remote server (SSH)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/servers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "prod",
+    "host": "192.168.1.10",
+    "user": "deploy",
+    "port": 22,
+    "private_key": "{{sshPrivateKey}}",
+    "is_local": false
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("serverId", res.body.id);
+}

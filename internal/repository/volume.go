@@ -3,8 +3,9 @@ package repository
 import (
 	"errors"
 
-	"gorm.io/gorm"
 	"mds-go-api-docker/internal/model"
+
+	"gorm.io/gorm"
 )
 
 type VolumeRepository struct {
@@ -17,7 +18,7 @@ func NewVolumeRepository(db *gorm.DB) *VolumeRepository {
 
 func (r *VolumeRepository) Create(projectID string, req model.CreateVolumeRequest) (*model.Volume, error) {
 	var project model.Project
-	if err := r.db.First(&project, projectID).Error; err != nil {
+	if err := r.db.First(&project, "id = ?", projectID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}

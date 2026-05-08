@@ -10,21 +10,55 @@ import (
 )
 
 type DeploymentService struct {
-	docker      *DockerService
+	serverRepo  *repository.ServerRepository
 	deployRepo  *repository.DeploymentRepository
 	projectRepo *repository.ProjectRepository
 }
 
 func NewDeploymentService(
-	docker *DockerService,
+	serverRepo *repository.ServerRepository,
 	deployRepo *repository.DeploymentRepository,
 	projectRepo *repository.ProjectRepository,
 ) *DeploymentService {
 	return &DeploymentService{
-		docker:      docker,
+		serverRepo:  serverRepo,
 		deployRepo:  deployRepo,
 		projectRepo: projectRepo,
 	}
+}
+
+func (s *DeploymentService) dockerForDeployment(deployment *model.Deployment) (*DockerService, error) {
+	if deployment.ServerID == nil || deployment.Server == nil {
+		return NewDockerService()
+	}
+	return NewDockerServiceForServer(*deployment.Server)
+}
+
+func (s *DeploymentService) applyStatus(ctx context.Context, deployment *model.Deployment, docker *DockerService) (*model.Deployment, error) {
+	running := 0
+	for i, c := range deployment.Containers {
+		status, err := docker.ContainerStatus(ctx, c.DockerID)
+		if err != nil {
+			deployment.Containers[i].Status = "unknown"
+		} else {
+			deployment.Containers[i].Status = status
+			if status == "running" {
+				running++
+			}
+		}
+	}
+
+	total := len(deployment.Containers)
+	switch {
+	case total == 0 || running == 0:
+		deployment.Status = "stopped"
+	case running == total:
+		deployment.Status = "running"
+	default:
+		deployment.Status = "partially-running"
+	}
+
+	return deployment, nil
 }
 
 func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req model.CreateDeploymentRequest) (*model.Deployment, error) {
@@ -38,6 +72,12 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 		return nil, err
 	}
 
+	docker, err := s.dockerForDeployment(deployment)
+	if err != nil {
+		return nil, err
+	}
+	defer docker.Close()
+
 	overrides := make(map[string]string, len(deployment.EnvOverride))
 	for _, ov := range deployment.EnvOverride {
 		overrides[ov.Key] = ov.Value
@@ -50,11 +90,11 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 
 	now := time.Now()
 	for _, svc := range sorted {
-		if err := s.docker.PullImage(ctx, svc.Image); err != nil {
+		if err := docker.PullImage(ctx, svc.Image); err != nil {
 			return nil, fmt.Errorf("pull %s: %w", svc.Image, err)
 		}
 
-		dockerID, err := s.docker.CreateAndStartContainer(ctx, ContainerConfig{
+		dockerID, err := docker.CreateAndStartContainer(ctx, ContainerConfig{
 			Name:    fmt.Sprintf("%s_%s", deployment.Name, svc.Name),
 			Image:   svc.Image,
 			Env:     mergeEnv(svc.EnvVars, overrides),
@@ -79,124 +119,94 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 
 	s.deployRepo.UpdateStartedAt(deployment.ID, now) //nolint:errcheck
 
-	return s.GetWithStatus(ctx, deployment.ID)
+	deployment, err = s.deployRepo.FindByID(deployment.ID)
+	if err != nil {
+		return nil, err
+	}
+	return s.applyStatus(ctx, deployment, docker)
 }
 
 func (s *DeploymentService) ListByProject(projectID string) ([]model.Deployment, error) {
 	return s.deployRepo.FindByProjectID(projectID)
 }
 
-func (s *DeploymentService) GetWithStatus(ctx context.Context, id uint) (*model.Deployment, error) {
+func (s *DeploymentService) GetWithStatus(ctx context.Context, id string) (*model.Deployment, error) {
 	deployment, err := s.deployRepo.FindByID(id)
 	if err != nil {
 		return nil, err
 	}
-
-	running := 0
-	for i, c := range deployment.Containers {
-		status, err := s.docker.ContainerStatus(ctx, c.DockerID)
-		if err != nil {
-			deployment.Containers[i].Status = "unknown"
-		} else {
-			deployment.Containers[i].Status = status
-			if status == "running" {
-				running++
-			}
-		}
-	}
-
-	total := len(deployment.Containers)
-	switch {
-	case total == 0 || running == 0:
-		deployment.Status = "stopped"
-	case running == total:
-		deployment.Status = "running"
-	default:
-		deployment.Status = "partially-running"
-	}
-
-	return deployment, nil
-}
-
-func (s *DeploymentService) GetWithStatusByStr(ctx context.Context, id string) (*model.Deployment, error) {
-	deployment, err := s.deployRepo.FindByIDStr(id)
+	docker, err := s.dockerForDeployment(deployment)
 	if err != nil {
 		return nil, err
 	}
-
-	running := 0
-	for i, c := range deployment.Containers {
-		status, err := s.docker.ContainerStatus(ctx, c.DockerID)
-		if err != nil {
-			deployment.Containers[i].Status = "unknown"
-		} else {
-			deployment.Containers[i].Status = status
-			if status == "running" {
-				running++
-			}
-		}
-	}
-
-	total := len(deployment.Containers)
-	switch {
-	case total == 0 || running == 0:
-		deployment.Status = "stopped"
-	case running == total:
-		deployment.Status = "running"
-	default:
-		deployment.Status = "partially-running"
-	}
-
-	return deployment, nil
+	defer docker.Close()
+	return s.applyStatus(ctx, deployment, docker)
 }
 
 func (s *DeploymentService) StartContainers(ctx context.Context, id string) (*model.Deployment, error) {
-	deployment, err := s.deployRepo.FindByIDStr(id)
+	deployment, err := s.deployRepo.FindByID(id)
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range deployment.Containers {
-		s.docker.StartContainer(ctx, c.DockerID) //nolint:errcheck
+	docker, err := s.dockerForDeployment(deployment)
+	if err != nil {
+		return nil, err
 	}
-	return s.GetWithStatusByStr(ctx, id)
+	defer docker.Close()
+	for _, c := range deployment.Containers {
+		docker.StartContainer(ctx, c.DockerID) //nolint:errcheck
+	}
+	return s.applyStatus(ctx, deployment, docker)
 }
 
 func (s *DeploymentService) StopContainers(ctx context.Context, id string) (*model.Deployment, error) {
-	deployment, err := s.deployRepo.FindByIDStr(id)
+	deployment, err := s.deployRepo.FindByID(id)
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range deployment.Containers {
-		s.docker.StopContainer(ctx, c.DockerID) //nolint:errcheck
+	docker, err := s.dockerForDeployment(deployment)
+	if err != nil {
+		return nil, err
 	}
-	return s.GetWithStatusByStr(ctx, id)
+	defer docker.Close()
+	for _, c := range deployment.Containers {
+		docker.StopContainer(ctx, c.DockerID) //nolint:errcheck
+	}
+	return s.applyStatus(ctx, deployment, docker)
 }
 
 func (s *DeploymentService) RestartContainers(ctx context.Context, id string) (*model.Deployment, error) {
-	deployment, err := s.deployRepo.FindByIDStr(id)
+	deployment, err := s.deployRepo.FindByID(id)
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range deployment.Containers {
-		s.docker.RestartContainer(ctx, c.DockerID) //nolint:errcheck
+	docker, err := s.dockerForDeployment(deployment)
+	if err != nil {
+		return nil, err
 	}
-	return s.GetWithStatusByStr(ctx, id)
+	defer docker.Close()
+	for _, c := range deployment.Containers {
+		docker.RestartContainer(ctx, c.DockerID) //nolint:errcheck
+	}
+	return s.applyStatus(ctx, deployment, docker)
 }
 
 func (s *DeploymentService) Stop(ctx context.Context, id string) error {
-	deployment, err := s.deployRepo.FindByIDStr(id)
+	deployment, err := s.deployRepo.FindByID(id)
 	if err != nil {
 		return err
 	}
-
-	for _, c := range deployment.Containers {
-		s.docker.StopAndRemoveContainer(ctx, c.DockerID) //nolint:errcheck
+	docker, err := s.dockerForDeployment(deployment)
+	if err != nil {
+		return err
 	}
-
+	defer docker.Close()
+	for _, c := range deployment.Containers {
+		docker.StopAndRemoveContainer(ctx, c.DockerID) //nolint:errcheck
+	}
 	return s.deployRepo.Delete(id)
 }
 
-// mergeEnv fusionne les EnvVar du service avec les overrides du déploiement.
 func mergeEnv(envVars []model.EnvVar, overrides map[string]string) []string {
 	result := make([]string, 0, len(envVars))
 	for _, ev := range envVars {
@@ -211,7 +221,6 @@ func mergeEnv(envVars []model.EnvVar, overrides map[string]string) []string {
 	return result
 }
 
-// topoSort trie les services selon leurs DependsOn (tri topologique).
 func topoSort(services []model.Service) ([]model.Service, error) {
 	byName := make(map[string]model.Service, len(services))
 	for _, s := range services {

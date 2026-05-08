@@ -1,0 +1,11 @@
+meta {
+  name: Start containers
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/deployments/{{deploymentId}}/start
+  body: none
+  auth: none
+}

@@ -30,7 +30,7 @@ func (h *ServiceHandler) Create(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(service)
 }
@@ -46,7 +46,7 @@ func (h *ServiceHandler) Update(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.JSON(service)
 }
@@ -56,7 +56,7 @@ func (h *ServiceHandler) Delete(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }

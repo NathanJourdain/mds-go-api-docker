@@ -9,16 +9,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func Setup(app *fiber.App, db *gorm.DB, dockerSvc *service.DockerService) {
+func Setup(app *fiber.App, db *gorm.DB) {
 	projectRepo := repository.NewProjectRepository(db)
+	serverRepo := repository.NewServerRepository(db)
 
-	hDocker := handler.NewDockerHandler(dockerSvc)
+	hDocker := handler.NewDockerHandler(serverRepo)
 	hProject := handler.NewProjectHandler(projectRepo)
 	hService := handler.NewServiceHandler(repository.NewServiceRepository(db))
 	hVolume := handler.NewVolumeHandler(repository.NewVolumeRepository(db))
 	hDeployment := handler.NewDeploymentHandler(
-		service.NewDeploymentService(dockerSvc, repository.NewDeploymentRepository(db), projectRepo),
+		service.NewDeploymentService(serverRepo, repository.NewDeploymentRepository(db), projectRepo),
 	)
+	hServer := handler.NewServerHandler(serverRepo)
 
 	api := app.Group("/api/v1")
 
@@ -49,4 +51,12 @@ func Setup(app *fiber.App, db *gorm.DB, dockerSvc *service.DockerService) {
 	docker := api.Group("/docker")
 	docker.Get("/images", hDocker.ListImages)
 	docker.Get("/images/:id", hDocker.GetImage)
+
+	servers := api.Group("/servers")
+	servers.Get("/", hServer.GetAll)
+	servers.Post("/", hServer.Create)
+	servers.Get("/:id", hServer.GetByID)
+	servers.Put("/:id", hServer.Update)
+	servers.Delete("/:id", hServer.Delete)
+	servers.Post("/:id/ping", hServer.TestConnection)
 }

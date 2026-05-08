@@ -1,0 +1,11 @@
+meta {
+  name: Stop containers
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/deployments/{{deploymentId}}/stop
+  body: none
+  auth: none
+}

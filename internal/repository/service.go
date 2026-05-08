@@ -16,7 +16,16 @@ func NewServiceRepository(db *gorm.DB) *ServiceRepository {
 }
 
 func (r *ServiceRepository) Create(projectID string, req model.CreateServiceRequest) (*model.Service, error) {
+	var project model.Project
+	if err := r.db.First(&project, "id = ?", projectID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
 	service := model.Service{
+		ProjectID:    project.ID,
 		Name:         req.Name,
 		Image:        req.Image,
 		Ports:        req.Ports,
@@ -24,22 +33,12 @@ func (r *ServiceRepository) Create(projectID string, req model.CreateServiceRequ
 		DependsOn:    req.DependsOn,
 	}
 
-	// On convertit le projectID string en uint via GORM
-	var project model.Project
-	if err := r.db.First(&project, projectID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	service.ProjectID = project.ID
-
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&service).Error; err != nil {
 			return err
 		}
 		for i := range req.EnvVars {
-			req.EnvVars[i].ID = 0
+			req.EnvVars[i].ID = ""
 			req.EnvVars[i].ServiceID = service.ID
 		}
 		if len(req.EnvVars) > 0 {
@@ -60,8 +59,6 @@ func (r *ServiceRepository) Update(projectID, serviceID string, req model.Update
 		return nil, err
 	}
 
-	// On construit un struct partiel + la liste des champs à sélectionner
-	// pour que GORM applique les serializers (json) correctement.
 	updates := model.Service{}
 	selected := []string{}
 
@@ -97,7 +94,7 @@ func (r *ServiceRepository) Update(projectID, serviceID string, req model.Update
 				return err
 			}
 			for i := range *req.EnvVars {
-				(*req.EnvVars)[i].ID = 0
+				(*req.EnvVars)[i].ID = ""
 				(*req.EnvVars)[i].ServiceID = service.ID
 			}
 			if len(*req.EnvVars) > 0 {
@@ -127,9 +124,9 @@ func (r *ServiceRepository) Delete(projectID, serviceID string) error {
 	})
 }
 
-func (r *ServiceRepository) findByID(id uint) (*model.Service, error) {
+func (r *ServiceRepository) findByID(id string) (*model.Service, error) {
 	var service model.Service
-	err := r.db.Preload("EnvVars").First(&service, id).Error
+	err := r.db.Preload("EnvVars").First(&service, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound

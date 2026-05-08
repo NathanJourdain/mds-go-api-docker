@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"net"
 
 	"mds-go-api-docker/internal/model"
 
@@ -11,10 +13,12 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 type DockerService struct {
-	cli *client.Client
+	cli       *client.Client
+	sshClient *gossh.Client
 }
 
 type ContainerConfig struct {
@@ -31,6 +35,54 @@ func NewDockerService() (*DockerService, error) {
 		return nil, err
 	}
 	return &DockerService{cli: cli}, nil
+}
+
+func NewDockerServiceForServer(server model.Server) (*DockerService, error) {
+	if server.IsLocal {
+		return NewDockerService()
+	}
+
+	signer, err := gossh.ParsePrivateKey([]byte(server.PrivateKey))
+	if err != nil {
+		return nil, fmt.Errorf("parse private key: %w", err)
+	}
+
+	sshConfig := &gossh.ClientConfig{
+		User:            server.User,
+		Auth:            []gossh.AuthMethod{gossh.PublicKeys(signer)},
+		HostKeyCallback: gossh.InsecureIgnoreHostKey(), //nolint:gosec
+	}
+
+	addr := fmt.Sprintf("%s:%d", server.Host, server.Port)
+	sshCli, err := gossh.Dial("tcp", addr, sshConfig)
+	if err != nil {
+		return nil, fmt.Errorf("ssh dial %s: %w", addr, err)
+	}
+
+	cli, err := client.NewClientWithOpts(
+		client.WithDialContext(func(ctx context.Context, _ string, _ string) (net.Conn, error) {
+			return sshCli.Dial("unix", "/var/run/docker.sock")
+		}),
+		client.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		sshCli.Close()
+		return nil, err
+	}
+
+	return &DockerService{cli: cli, sshClient: sshCli}, nil
+}
+
+func (s *DockerService) Close() {
+	s.cli.Close()
+	if s.sshClient != nil {
+		s.sshClient.Close()
+	}
+}
+
+func (s *DockerService) Ping(ctx context.Context) error {
+	_, err := s.cli.Ping(ctx)
+	return err
 }
 
 func (s *DockerService) ListImages(ctx context.Context) ([]image.Summary, error) {

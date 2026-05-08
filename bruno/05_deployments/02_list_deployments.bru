@@ -1,0 +1,11 @@
+meta {
+  name: List deployments
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/projects/{{projectId}}/deployments
+  body: none
+  auth: none
+}

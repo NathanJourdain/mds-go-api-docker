@@ -1,0 +1,22 @@
+meta {
+  name: Create local server
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/servers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "local",
+    "is_local": true
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("serverId", res.body.id);
+}

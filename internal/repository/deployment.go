@@ -16,9 +16,10 @@ func NewDeploymentRepository(db *gorm.DB) *DeploymentRepository {
 	return &DeploymentRepository{db: db}
 }
 
-func (r *DeploymentRepository) Create(projectID uint, req model.CreateDeploymentRequest) (*model.Deployment, error) {
+func (r *DeploymentRepository) Create(projectID string, req model.CreateDeploymentRequest) (*model.Deployment, error) {
 	deployment := model.Deployment{
 		ProjectID: projectID,
+		ServerID:  req.ServerID,
 		Name:      req.Name,
 	}
 
@@ -27,7 +28,7 @@ func (r *DeploymentRepository) Create(projectID uint, req model.CreateDeployment
 			return err
 		}
 		for i := range req.EnvOverride {
-			req.EnvOverride[i].ID = 0
+			req.EnvOverride[i].ID = ""
 			req.EnvOverride[i].DeploymentID = deployment.ID
 		}
 		if len(req.EnvOverride) > 0 {
@@ -48,9 +49,9 @@ func (r *DeploymentRepository) FindByProjectID(projectID string) ([]model.Deploy
 	return deployments, err
 }
 
-func (r *DeploymentRepository) FindByID(id uint) (*model.Deployment, error) {
+func (r *DeploymentRepository) FindByID(id string) (*model.Deployment, error) {
 	var deployment model.Deployment
-	err := r.db.Preload("Containers").Preload("EnvOverride").First(&deployment, id).Error
+	err := r.db.Preload("Containers").Preload("EnvOverride").Preload("Server").First(&deployment, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -61,32 +62,24 @@ func (r *DeploymentRepository) FindByID(id uint) (*model.Deployment, error) {
 }
 
 func (r *DeploymentRepository) FindByIDStr(id string) (*model.Deployment, error) {
-	var deployment model.Deployment
-	err := r.db.Preload("Containers").Preload("EnvOverride").First(&deployment, id).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	return &deployment, nil
+	return r.FindByID(id)
 }
 
 func (r *DeploymentRepository) SaveContainer(c *model.Container) error {
 	return r.db.Create(c).Error
 }
 
-func (r *DeploymentRepository) UpdateStartedAt(id uint, t time.Time) error {
+func (r *DeploymentRepository) UpdateStartedAt(id string, t time.Time) error {
 	return r.db.Model(&model.Deployment{}).Where("id = ?", id).Update("started_at", t).Error
 }
 
-func (r *DeploymentRepository) ReplaceEnvOverride(deploymentID uint, overrides []model.DeploymentEnvOverride) error {
+func (r *DeploymentRepository) ReplaceEnvOverride(deploymentID string, overrides []model.DeploymentEnvOverride) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("deployment_id = ?", deploymentID).Delete(&model.DeploymentEnvOverride{}).Error; err != nil {
 			return err
 		}
 		for i := range overrides {
-			overrides[i].ID = 0
+			overrides[i].ID = ""
 			overrides[i].DeploymentID = deploymentID
 		}
 		if len(overrides) > 0 {
@@ -98,7 +91,7 @@ func (r *DeploymentRepository) ReplaceEnvOverride(deploymentID uint, overrides [
 
 func (r *DeploymentRepository) Delete(id string) error {
 	var deployment model.Deployment
-	if err := r.db.First(&deployment, id).Error; err != nil {
+	if err := r.db.First(&deployment, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		}

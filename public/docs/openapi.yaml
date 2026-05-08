@@ -5,9 +5,10 @@ info:
   description: API Go Fiber pour décrire et déployer des infrastructures multi-conteneurs via Docker SDK.
 
 servers:
-  - url: http://localhost:3000/api/v1
+  - url: https://api.mds-go-api-docker.orb.local/api/v1
 
 tags:
+  - name: servers
   - name: projects
   - name: services
   - name: volumes
@@ -114,7 +115,8 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
+          type: string
+          format: uuid
     put:
       tags: [services]
       summary: Mettre à jour un service
@@ -169,7 +171,8 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
+          type: string
+          format: uuid
     delete:
       tags: [volumes]
       summary: Supprimer un volume
@@ -265,10 +268,118 @@ paths:
         "200":
           description: Déploiement redémarré
 
+  /servers:
+    get:
+      tags: [servers]
+      summary: Lister tous les serveurs
+      responses:
+        "200":
+          description: Liste de serveurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Server"
+    post:
+      tags: [servers]
+      summary: Créer un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServerRequest"
+      responses:
+        "201":
+          description: Serveur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /servers/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [servers]
+      summary: Obtenir un serveur par ID
+      responses:
+        "200":
+          description: Serveur trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [servers]
+      summary: Mettre à jour un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServerRequest"
+      responses:
+        "200":
+          description: Serveur mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [servers]
+      summary: Supprimer un serveur
+      responses:
+        "204":
+          description: Serveur supprimé
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /servers/{id}/ping:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [servers]
+      summary: Tester la connexion Docker d'un serveur
+      responses:
+        "200":
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          description: Impossible de joindre le Docker Engine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /docker/images:
     get:
       tags: [docker]
       summary: Lister les images Docker
+      parameters:
+        - name: server_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: ID du serveur cible (local si absent)
       responses:
         "200":
           description: Liste d'images
@@ -281,10 +392,22 @@ paths:
 
   /docker/images/{id}:
     parameters:
-      - $ref: "#/components/parameters/ID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: ID ou nom de l'image Docker
     get:
       tags: [docker]
       summary: Obtenir une image Docker par ID
+      parameters:
+        - name: server_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: ID du serveur cible (local si absent)
       responses:
         "200":
           description: Image trouvée
@@ -302,11 +425,18 @@ components:
       in: path
       required: true
       schema:
-        type: integer
+        type: string
+        format: uuid
 
   responses:
     NotFound:
       description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: Requête invalide
       content:
         application/json:
           schema:
@@ -323,7 +453,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         created_at:
           type: string
           format: date-time
@@ -364,7 +495,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         created_at:
           type: string
           format: date-time
@@ -372,7 +504,7 @@ components:
           type: string
           format: date-time
         project_id:
-          type: integer
+          type: string
         name:
           type: string
         image:
@@ -458,9 +590,10 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         service_id:
-          type: integer
+          type: string
         key:
           type: string
         value:
@@ -480,7 +613,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         created_at:
           type: string
           format: date-time
@@ -488,7 +622,7 @@ components:
           type: string
           format: date-time
         project_id:
-          type: integer
+          type: string
         name:
           type: string
         driver:
@@ -509,8 +643,12 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         created_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time
         started_at:
@@ -518,7 +656,13 @@ components:
           format: date-time
           nullable: true
         project_id:
-          type: integer
+          type: string
+        server_id:
+          type: string
+          nullable: true
+        server:
+          $ref: "#/components/schemas/Server"
+          nullable: true
         name:
           type: string
         status:
@@ -538,6 +682,11 @@ components:
       properties:
         name:
           type: string
+        server_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID du serveur cible (local si absent)
         env_override:
           type: array
           items:
@@ -547,10 +696,74 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         deployment_id:
-          type: integer
+          type: string
         key:
           type: string
         value:
           type: string
+
+    Server:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+        host:
+          type: string
+        user:
+          type: string
+        port:
+          type: integer
+          default: 22
+        is_local:
+          type: boolean
+
+    CreateServerRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        host:
+          type: string
+          description: Adresse de l'hôte distant (ignoré si is_local=true)
+        user:
+          type: string
+          description: Utilisateur SSH (ignoré si is_local=true)
+        port:
+          type: integer
+          default: 22
+        private_key:
+          type: string
+          description: Clé privée SSH au format PEM (jamais retournée par l'API)
+        is_local:
+          type: boolean
+          default: false
+
+    UpdateServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        host:
+          type: string
+        user:
+          type: string
+        port:
+          type: integer
+        private_key:
+          type: string
+          description: Clé privée SSH au format PEM (jamais retournée par l'API)
+        is_local:
+          type: boolean

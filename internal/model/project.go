@@ -1,11 +1,7 @@
 package model
 
-import "time"
-
 type Project struct {
-	ID          uint      `json:"id"          gorm:"primarykey;autoIncrement"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Base
 	Name        string    `json:"name"        gorm:"not null;uniqueIndex"`
 	Description string    `json:"description"`
 	Services    []Service `json:"services,omitempty" gorm:"foreignKey:ProjectID"`

@@ -1,0 +1,11 @@
+meta {
+  name: Restart containers
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/deployments/{{deploymentId}}/restart
+  body: none
+  auth: none
+}

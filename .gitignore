@@ -1,3 +1,5 @@
 tmp/
 app.db
 .env
+bruno/environments/local.bru
+.DS_Store

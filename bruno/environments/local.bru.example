@@ -1,0 +1,12 @@
+vars {
+  baseUrl: http://api.mds-go-api-docker.orb.local/api/v1
+  serverId:
+  projectId:
+  serviceId:
+  volumeId:
+  deploymentId:
+}
+
+vars:secret {
+  sshPrivateKey:
+}

@@ -19,7 +19,7 @@ func NewProjectHandler(repo *repository.ProjectRepository) *ProjectHandler {
 func (h *ProjectHandler) GetAll(c *fiber.Ctx) error {
 	projects, err := h.repo.FindAll()
 	if err != nil {
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.JSON(projects)
 }
@@ -30,7 +30,7 @@ func (h *ProjectHandler) GetByID(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.JSON(project)
 }
@@ -45,7 +45,7 @@ func (h *ProjectHandler) Create(c *fiber.Ctx) error {
 	}
 	project, err := h.repo.Create(req)
 	if err != nil {
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(project)
 }
@@ -60,7 +60,7 @@ func (h *ProjectHandler) Update(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.JSON(project)
 }
@@ -70,7 +70,7 @@ func (h *ProjectHandler) Delete(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }

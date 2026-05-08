@@ -1,0 +1,22 @@
+meta {
+  name: Deploy project
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/projects/{{projectId}}/deployments
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "v1",
+    "server_id": "{{serverId}}"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("deploymentId", res.body.id);
+}

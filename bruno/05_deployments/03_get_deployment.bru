@@ -1,0 +1,11 @@
+meta {
+  name: Get deployment status
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/deployments/{{deploymentId}}
+  body: none
+  auth: none
+}

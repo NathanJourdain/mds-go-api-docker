@@ -30,7 +30,7 @@ func (h *VolumeHandler) Create(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(volume)
 }
@@ -40,7 +40,7 @@ func (h *VolumeHandler) Delete(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }

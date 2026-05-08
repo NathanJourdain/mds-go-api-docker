@@ -9,7 +9,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"mds-go-api-docker/internal/database"
 	"mds-go-api-docker/internal/router"
-	"mds-go-api-docker/internal/service"
 )
 
 func main() {
@@ -23,11 +22,6 @@ func main() {
 		log.Fatalf("database: %v", err)
 	}
 
-	dockerSvc, err := service.NewDockerService()
-	if err != nil {
-		log.Fatalf("docker: %v", err)
-	}
-
 	app := fiber.New(fiber.Config{
 		AppName: "mds-go-api",
 	})
@@ -35,7 +29,7 @@ func main() {
 	app.Use(recover.New())
 	app.Use(logger.New())
 
-	router.Setup(app, db, dockerSvc)
+	router.Setup(app, db)
 
 	app.Static("/", "./public")
 

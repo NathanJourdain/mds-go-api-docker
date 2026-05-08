@@ -3,8 +3,9 @@ package repository
 import (
 	"errors"
 
-	"gorm.io/gorm"
 	"mds-go-api-docker/internal/model"
+
+	"gorm.io/gorm"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -27,7 +28,7 @@ func (r *ProjectRepository) FindAll() ([]model.Project, error) {
 
 func (r *ProjectRepository) FindByID(id string) (*model.Project, error) {
 	var project model.Project
-	err := r.db.Preload("Services.EnvVars").Preload("Volumes").First(&project, id).Error
+	err := r.db.Preload("Services.EnvVars").Preload("Volumes").First(&project, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -69,7 +70,7 @@ func (r *ProjectRepository) Update(id string, req model.UpdateProjectRequest) (*
 }
 
 func (r *ProjectRepository) Delete(id string) error {
-	result := r.db.Delete(&model.Project{}, id)
+	result := r.db.Delete(&model.Project{}, "id = ?", id)
 	if result.Error != nil {
 		return result.Error
 	}

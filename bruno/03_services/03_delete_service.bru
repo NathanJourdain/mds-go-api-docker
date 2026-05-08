@@ -1,0 +1,11 @@
+meta {
+  name: Delete service
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/projects/{{projectId}}/services/{{serviceId}}
+  body: none
+  auth: none
+}

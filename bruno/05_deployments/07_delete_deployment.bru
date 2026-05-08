@@ -1,0 +1,11 @@
+meta {
+  name: Delete deployment
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/deployments/{{deploymentId}}
+  body: none
+  auth: none
+}

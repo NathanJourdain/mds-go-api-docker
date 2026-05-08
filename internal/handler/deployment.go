@@ -32,7 +32,7 @@ func (h *DeploymentHandler) Deploy(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return internalError(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(deployment)
 }
@@ -40,18 +40,18 @@ func (h *DeploymentHandler) Deploy(c *fiber.Ctx) error {
 func (h *DeploymentHandler) ListByProject(c *fiber.Ctx) error {
 	deployments, err := h.svc.ListByProject(c.Params("id"))
 	if err != nil {
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.JSON(deployments)
 }
 
 func (h *DeploymentHandler) GetByID(c *fiber.Ctx) error {
-	deployment, err := h.svc.GetWithStatusByStr(c.Context(), c.Params("id"))
+	deployment, err := h.svc.GetWithStatus(c.Context(), c.Params("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.JSON(deployment)
 }
@@ -62,7 +62,7 @@ func (h *DeploymentHandler) Start(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return internalError(c, err)
 	}
 	return c.JSON(deployment)
 }
@@ -73,7 +73,7 @@ func (h *DeploymentHandler) Stop(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return internalError(c, err)
 	}
 	return c.JSON(deployment)
 }
@@ -84,7 +84,7 @@ func (h *DeploymentHandler) Restart(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return internalError(c, err)
 	}
 	return c.JSON(deployment)
 }
@@ -94,7 +94,7 @@ func (h *DeploymentHandler) Delete(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}
-		return internalError(c)
+		return internalError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }

@@ -3,25 +3,26 @@ package model
 import "time"
 
 type Deployment struct {
-	ID          uint                    `json:"id"           gorm:"primarykey;autoIncrement"`
-	CreatedAt   time.Time               `json:"created_at"`
+	Base
 	StartedAt   *time.Time              `json:"started_at"`
-	ProjectID   uint                    `json:"project_id"   gorm:"not null;index"`
-	Name        string                  `json:"name"         gorm:"not null"`
-	Status      string                  `json:"status"       gorm:"-"` // calculé via Docker SDK
+	ProjectID   string                  `json:"project_id"             gorm:"not null;index;type:text"`
+	ServerID    *string                 `json:"server_id"              gorm:"index;type:text"`
+	Server      *Server                 `json:"server,omitempty"       gorm:"foreignKey:ServerID"`
+	Name        string                  `json:"name"                   gorm:"not null"`
+	Status      string                  `json:"status"                 gorm:"-"`
 	EnvOverride []DeploymentEnvOverride `json:"env_override,omitempty" gorm:"foreignKey:DeploymentID"`
 	Containers  []Container             `json:"containers,omitempty"   gorm:"foreignKey:DeploymentID"`
 }
 
-// DeploymentEnvOverride surcharge les EnvVar marquées IsVariable=true au moment du déploiement.
 type DeploymentEnvOverride struct {
-	ID           uint   `json:"id"            gorm:"primarykey;autoIncrement"`
-	DeploymentID uint   `json:"deployment_id" gorm:"not null;index"`
+	IDModel
+	DeploymentID string `json:"deployment_id" gorm:"not null;index;type:text"`
 	Key          string `json:"key"           gorm:"not null"`
 	Value        string `json:"value"`
 }
 
 type CreateDeploymentRequest struct {
 	Name        string                  `json:"name"`
+	ServerID    *string                 `json:"server_id"`
 	EnvOverride []DeploymentEnvOverride `json:"env_override"`
 }
