@@ -626,6 +626,7 @@ components:
           format: date-time
         project_id:
           type: string
+          format: uuid
         name:
           type: string
         image:
@@ -754,6 +755,7 @@ components:
           format: uuid
         service_id:
           type: string
+          format: uuid
         key:
           type: string
         value:
@@ -783,6 +785,7 @@ components:
           format: date-time
         project_id:
           type: string
+          format: uuid
         name:
           type: string
         driver:
@@ -813,6 +816,7 @@ components:
           format: date-time
         project_id:
           type: string
+          format: uuid
         name:
           type: string
         driver:
@@ -844,6 +848,7 @@ components:
           format: date-time
         project_id:
           type: string
+          format: uuid
         name:
           type: string
 
@@ -876,6 +881,7 @@ components:
           format: uuid
         service_id:
           type: string
+          format: uuid
         key:
           type: string
         value:
@@ -899,8 +905,10 @@ components:
           nullable: true
         project_id:
           type: string
+          format: uuid
         server_id:
           type: string
+          format: uuid
           nullable: true
         server:
           $ref: "#/components/schemas/Server"
@@ -942,6 +950,7 @@ components:
           description: Nom logique du réseau (tel que défini dans le projet)
         docker_network_id:
           type: string
+          format: uuid
           description: ID du réseau retourné par le Docker Engine
 
     Container:
@@ -958,6 +967,7 @@ components:
           format: uuid
         docker_id:
           type: string
+          format: uuid
           description: ID du conteneur retourné par le Docker Engine
         name:
           type: string
@@ -1019,6 +1029,7 @@ components:
           format: uuid
         deployment_id:
           type: string
+          format: uuid
         key:
           type: string
         value:
