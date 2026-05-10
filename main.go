@@ -4,11 +4,13 @@ import (
 	"log"
 	"os"
 
+	"mds-go-api-docker/internal/database"
+	"mds-go-api-docker/internal/middleware"
+	"mds-go-api-docker/internal/router"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"mds-go-api-docker/internal/database"
-	"mds-go-api-docker/internal/router"
 )
 
 func main() {
@@ -28,6 +30,12 @@ func main() {
 
 	app.Use(recover.New())
 	app.Use(logger.New())
+
+	apiKey := os.Getenv("API_KEY")
+	if apiKey == "" {
+		log.Fatal("API_KEY environment variable is required")
+	}
+	app.Use(middleware.APIKey(apiKey))
 
 	router.Setup(app, db)
 

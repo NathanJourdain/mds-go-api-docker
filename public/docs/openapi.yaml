@@ -2,10 +2,22 @@ openapi: 3.1.0
 info:
   title: Docker Manager API
   version: 1.0.0
-  description: API Go Fiber pour décrire et déployer des infrastructures multi-conteneurs via Docker SDK.
+  description: |
+    API Go Fiber pour décrire et déployer des infrastructures multi-conteneurs via Docker SDK.
+
+    ## Authentification
+
+    Tous les endpoints `/api/*` sont protégés par une clé API.
+    Fournir la clé dans le header `X-API-Key` de chaque requête.
+
+    La clé est définie via la variable d'environnement `API_KEY` au démarrage du conteneur.
+    Toute requête sans clé valide retourne `401 Unauthorized`.
 
 servers:
   - url: https://api.mds-go-api-docker.orb.local/api/v1
+
+security:
+  - ApiKeyAuth: []
 
 tags:
   - name: servers
@@ -515,6 +527,13 @@ components:
         type: string
         format: uuid
 
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clé API à définir via la variable d'environnement API_KEY au démarrage du conteneur.
+
   responses:
     NotFound:
       description: Ressource introuvable
@@ -524,6 +543,12 @@ components:
             $ref: "#/components/schemas/Error"
     BadRequest:
       description: Requête invalide
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Clé API absente ou invalide
       content:
         application/json:
           schema:

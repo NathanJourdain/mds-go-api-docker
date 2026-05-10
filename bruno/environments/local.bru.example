@@ -5,6 +5,7 @@ vars {
   serviceId:
   volumeId:
   deploymentId:
+  apiKey:
 }
 
 vars:secret {
