@@ -2,18 +2,21 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"os"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"mds-go-api-docker/internal/database"
 	"mds-go-api-docker/internal/middleware"
 	"mds-go-api-docker/internal/router"
-
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = "app.db"
@@ -29,7 +32,8 @@ func main() {
 	})
 
 	app.Use(recover.New())
-	app.Use(logger.New())
+	app.Use(middleware.RequestID())
+	app.Use(middleware.Logger())
 
 	apiKey := os.Getenv("API_KEY")
 	if apiKey == "" {
@@ -50,5 +54,6 @@ func main() {
 		port = "3000"
 	}
 
+	slog.Info("server starting", "port", port)
 	log.Fatal(app.Listen(":" + port))
 }
