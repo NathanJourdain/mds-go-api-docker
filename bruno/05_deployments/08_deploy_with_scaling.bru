@@ -13,6 +13,9 @@ post {
 body:json {
   {
     "name": "v1-scaled",
+    "secret_override": {
+      "DB_PASSWORD": "prod_s3cr3t"
+    },
     "scale": {
       "web": 2
     }

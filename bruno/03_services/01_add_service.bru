@@ -19,7 +19,13 @@ body:json {
     ],
     "env_vars": [
       { "key": "ENV", "value": "production", "is_variable": false }
-    ]
+    ],
+    "labels": [
+      { "key": "traefik.enable", "value": "true" },
+      { "key": "traefik.http.routers.web.rule", "value": "Host(`web.localhost`)" }
+    ],
+    "secrets": [],
+    "networks": []
   }
 }
 

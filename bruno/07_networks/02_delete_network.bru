@@ -1,0 +1,11 @@
+meta {
+  name: Delete network
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/projects/{{projectId}}/networks/{{networkId}}
+  body: none
+  auth: none
+}

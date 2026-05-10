@@ -17,6 +17,8 @@ func Setup(app *fiber.App, db *gorm.DB) {
 	hProject := handler.NewProjectHandler(projectRepo)
 	hService := handler.NewServiceHandler(repository.NewServiceRepository(db))
 	hVolume := handler.NewVolumeHandler(repository.NewVolumeRepository(db))
+	hNetwork := handler.NewNetworkHandler(repository.NewNetworkRepository(db))
+	hSecret := handler.NewSecretHandler(repository.NewSecretRepository(db))
 	hDeployment := handler.NewDeploymentHandler(
 		service.NewDeploymentService(serverRepo, repository.NewDeploymentRepository(db), projectRepo),
 	)
@@ -37,6 +39,12 @@ func Setup(app *fiber.App, db *gorm.DB) {
 
 	projects.Post("/:id/volumes", hVolume.Create)
 	projects.Delete("/:id/volumes/:vid", hVolume.Delete)
+
+	projects.Post("/:id/networks", hNetwork.Create)
+	projects.Delete("/:id/networks/:nid", hNetwork.Delete)
+
+	projects.Post("/:id/secrets", hSecret.Create)
+	projects.Delete("/:id/secrets/:sid", hSecret.Delete)
 
 	projects.Post("/:id/deployments", hDeployment.Deploy)
 	projects.Get("/:id/deployments", hDeployment.ListByProject)

@@ -29,6 +29,8 @@ func (r *ServiceRepository) Create(projectID string, req model.CreateServiceRequ
 		Name:         req.Name,
 		Image:        req.Image,
 		Ports:        req.Ports,
+		Secrets:      req.Secrets,
+		Networks:     req.Networks,
 		VolumeMounts: req.VolumeMounts,
 		DependsOn:    req.DependsOn,
 	}
@@ -42,7 +44,16 @@ func (r *ServiceRepository) Create(projectID string, req model.CreateServiceRequ
 			req.EnvVars[i].ServiceID = service.ID
 		}
 		if len(req.EnvVars) > 0 {
-			return tx.Create(&req.EnvVars).Error
+			if err := tx.Create(&req.EnvVars).Error; err != nil {
+				return err
+			}
+		}
+		for i := range req.Labels {
+			req.Labels[i].ID = ""
+			req.Labels[i].ServiceID = service.ID
+		}
+		if len(req.Labels) > 0 {
+			return tx.Create(&req.Labels).Error
 		}
 		return nil
 	})
@@ -82,6 +93,14 @@ func (r *ServiceRepository) Update(projectID, serviceID string, req model.Update
 		updates.DependsOn = req.DependsOn
 		selected = append(selected, "DependsOn")
 	}
+	if req.Secrets != nil {
+		updates.Secrets = req.Secrets
+		selected = append(selected, "Secrets")
+	}
+	if req.Networks != nil {
+		updates.Networks = req.Networks
+		selected = append(selected, "Networks")
+	}
 
 	err = r.db.Transaction(func(tx *gorm.DB) error {
 		if len(selected) > 0 {
@@ -98,7 +117,21 @@ func (r *ServiceRepository) Update(projectID, serviceID string, req model.Update
 				(*req.EnvVars)[i].ServiceID = service.ID
 			}
 			if len(*req.EnvVars) > 0 {
-				return tx.Create(req.EnvVars).Error
+				if err := tx.Create(req.EnvVars).Error; err != nil {
+					return err
+				}
+			}
+		}
+		if req.Labels != nil {
+			if err := tx.Where("service_id = ?", service.ID).Delete(&model.Label{}).Error; err != nil {
+				return err
+			}
+			for i := range *req.Labels {
+				(*req.Labels)[i].ID = ""
+				(*req.Labels)[i].ServiceID = service.ID
+			}
+			if len(*req.Labels) > 0 {
+				return tx.Create(req.Labels).Error
 			}
 		}
 		return nil
@@ -117,16 +150,15 @@ func (r *ServiceRepository) Delete(projectID, serviceID string) error {
 	}
 
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("service_id = ?", service.ID).Delete(&model.EnvVar{}).Error; err != nil {
-			return err
-		}
+		tx.Where("service_id = ?", service.ID).Delete(&model.EnvVar{})
+		tx.Where("service_id = ?", service.ID).Delete(&model.Label{})
 		return tx.Delete(service).Error
 	})
 }
 
 func (r *ServiceRepository) findByID(id string) (*model.Service, error) {
 	var service model.Service
-	err := r.db.Preload("EnvVars").First(&service, "id = ?", id).Error
+	err := r.db.Preload("EnvVars").Preload("Labels").First(&service, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound

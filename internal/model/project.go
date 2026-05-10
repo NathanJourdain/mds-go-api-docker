@@ -2,10 +2,12 @@ package model
 
 type Project struct {
 	Base
-	Name        string    `json:"name"        gorm:"not null;uniqueIndex"`
+	Name        string    `json:"name"               gorm:"not null;uniqueIndex"`
 	Description string    `json:"description"`
 	Services    []Service `json:"services,omitempty" gorm:"foreignKey:ProjectID"`
 	Volumes     []Volume  `json:"volumes,omitempty"  gorm:"foreignKey:ProjectID"`
+	Networks    []Network `json:"networks,omitempty" gorm:"foreignKey:ProjectID"`
+	Secrets     []Secret  `json:"secrets,omitempty"  gorm:"foreignKey:ProjectID"`
 }
 
 type CreateProjectRequest struct {

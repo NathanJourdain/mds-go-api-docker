@@ -12,6 +12,11 @@ put {
 
 body:json {
   {
-    "image": "nginx:latest"
+    "image": "nginx:latest",
+    "labels": [
+      { "key": "traefik.enable", "value": "true" }
+    ],
+    "secrets": [],
+    "networks": []
   }
 }

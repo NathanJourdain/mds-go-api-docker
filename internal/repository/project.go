@@ -28,7 +28,13 @@ func (r *ProjectRepository) FindAll() ([]model.Project, error) {
 
 func (r *ProjectRepository) FindByID(id string) (*model.Project, error) {
 	var project model.Project
-	err := r.db.Preload("Services.EnvVars").Preload("Volumes").First(&project, "id = ?", id).Error
+	err := r.db.
+		Preload("Services.EnvVars").
+		Preload("Services.Labels").
+		Preload("Volumes").
+		Preload("Networks").
+		Preload("Secrets").
+		First(&project, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound

@@ -1,0 +1,22 @@
+meta {
+  name: Add network
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/projects/{{projectId}}/networks
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "backend",
+    "driver": "bridge"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("networkId", res.body.id);
+}

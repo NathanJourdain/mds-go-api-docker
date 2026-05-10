@@ -79,9 +79,33 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 	}
 	defer docker.Close()
 
+	// Create Docker networks and build a name→dockerID map
+	dockerNetworkIDs := make(map[string]string, len(project.Networks))
+	for _, n := range project.Networks {
+		dockerName := fmt.Sprintf("%s_%s", deployment.ID[:8], n.Name)
+		dockerNetworkID, err := docker.CreateNetwork(ctx, dockerName, n.Driver)
+		if err != nil {
+			return nil, fmt.Errorf("create network %s: %w", n.Name, err)
+		}
+		dockerNetworkIDs[n.Name] = dockerNetworkID
+		dn := model.DeploymentNetwork{
+			DeploymentID:    deployment.ID,
+			Name:            n.Name,
+			DockerNetworkID: dockerNetworkID,
+		}
+		if err := s.deployRepo.SaveNetwork(&dn); err != nil {
+			return nil, err
+		}
+	}
+
+	// Build env overrides and secrets maps
 	overrides := make(map[string]string, len(deployment.EnvOverride))
 	for _, ov := range deployment.EnvOverride {
 		overrides[ov.Key] = ov.Value
+	}
+	secretsByName := make(map[string]string, len(deployment.SecretOverride))
+	for _, sec := range deployment.SecretOverride {
+		secretsByName[sec.Name] = sec.Value
 	}
 
 	sorted, err := topoSort(project.Services)
@@ -95,12 +119,27 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 			return nil, fmt.Errorf("pull %s: %w", svc.Image, err)
 		}
 
+		// Resolve service network names to Docker network IDs
+		networkIDs := make([]string, 0, len(svc.Networks))
+		for _, name := range svc.Networks {
+			id, ok := dockerNetworkIDs[name]
+			if !ok {
+				return nil, fmt.Errorf("service %q references unknown network %q", svc.Name, name)
+			}
+			networkIDs = append(networkIDs, id)
+		}
+
+		labels := make(map[string]string, len(svc.Labels))
+		for _, l := range svc.Labels {
+			labels[l.Key] = l.Value
+		}
+
+		env := mergeEnv(svc.EnvVars, overrides, secretsByName, svc.Secrets)
+
 		replicas := 1
 		if n, ok := req.Scale[svc.Name]; ok && n > 1 {
 			replicas = n
 		}
-
-		env := mergeEnv(svc.EnvVars, overrides)
 
 		for i := range replicas {
 			replicaIdx := i + 1
@@ -108,11 +147,13 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 			name := fmt.Sprintf("%s_%s_%d", deployment.Name, svc.Name, replicaIdx)
 
 			dockerID, err := docker.CreateAndStartContainer(ctx, ContainerConfig{
-				Name:    name,
-				Image:   svc.Image,
-				Env:     env,
-				Ports:   ports,
-				Volumes: svc.VolumeMounts,
+				Name:     name,
+				Image:    svc.Image,
+				Env:      env,
+				Ports:    ports,
+				Volumes:  svc.VolumeMounts,
+				Labels:   labels,
+				Networks: networkIDs,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("start %s replica %d: %w", svc.Name, replicaIdx, err)
@@ -219,6 +260,9 @@ func (s *DeploymentService) Stop(ctx context.Context, id string) error {
 	for _, c := range deployment.Containers {
 		docker.StopAndRemoveContainer(ctx, c.DockerID) //nolint:errcheck
 	}
+	for _, n := range deployment.Networks {
+		docker.RemoveNetwork(ctx, n.DockerNetworkID) //nolint:errcheck
+	}
 	return s.deployRepo.Delete(id)
 }
 
@@ -237,8 +281,8 @@ func scalePorts(ports []model.PortMapping, offset int) []model.PortMapping {
 	return result
 }
 
-func mergeEnv(envVars []model.EnvVar, overrides map[string]string) []string {
-	result := make([]string, 0, len(envVars))
+func mergeEnv(envVars []model.EnvVar, overrides map[string]string, secrets map[string]string, serviceSecrets []string) []string {
+	result := make([]string, 0, len(envVars)+len(serviceSecrets))
 	for _, ev := range envVars {
 		value := ev.Value
 		if ev.IsVariable {
@@ -247,6 +291,11 @@ func mergeEnv(envVars []model.EnvVar, overrides map[string]string) []string {
 			}
 		}
 		result = append(result, ev.Key+"="+value)
+	}
+	for _, name := range serviceSecrets {
+		if value, ok := secrets[name]; ok {
+			result = append(result, name+"="+value)
+		}
 	}
 	return result
 }

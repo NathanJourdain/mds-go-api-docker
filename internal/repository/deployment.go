@@ -32,7 +32,20 @@ func (r *DeploymentRepository) Create(projectID string, req model.CreateDeployme
 			req.EnvOverride[i].DeploymentID = deployment.ID
 		}
 		if len(req.EnvOverride) > 0 {
-			return tx.Create(&req.EnvOverride).Error
+			if err := tx.Create(&req.EnvOverride).Error; err != nil {
+				return err
+			}
+		}
+		secretOverrides := make([]model.DeploymentSecretOverride, 0, len(req.SecretOverride))
+		for name, value := range req.SecretOverride {
+			secretOverrides = append(secretOverrides, model.DeploymentSecretOverride{
+				DeploymentID: deployment.ID,
+				Name:         name,
+				Value:        value,
+			})
+		}
+		if len(secretOverrides) > 0 {
+			return tx.Create(&secretOverrides).Error
 		}
 		return nil
 	})
@@ -51,7 +64,13 @@ func (r *DeploymentRepository) FindByProjectID(projectID string) ([]model.Deploy
 
 func (r *DeploymentRepository) FindByID(id string) (*model.Deployment, error) {
 	var deployment model.Deployment
-	err := r.db.Preload("Containers").Preload("EnvOverride").Preload("Server").First(&deployment, "id = ?", id).Error
+	err := r.db.
+		Preload("Containers").
+		Preload("EnvOverride").
+		Preload("SecretOverride").
+		Preload("Server").
+		Preload("Networks").
+		First(&deployment, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -67,6 +86,10 @@ func (r *DeploymentRepository) FindByIDStr(id string) (*model.Deployment, error)
 
 func (r *DeploymentRepository) SaveContainer(c *model.Container) error {
 	return r.db.Create(c).Error
+}
+
+func (r *DeploymentRepository) SaveNetwork(n *model.DeploymentNetwork) error {
+	return r.db.Create(n).Error
 }
 
 func (r *DeploymentRepository) UpdateStartedAt(id string, t time.Time) error {
@@ -100,6 +123,8 @@ func (r *DeploymentRepository) Delete(id string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		tx.Where("deployment_id = ?", deployment.ID).Delete(&model.Container{})
 		tx.Where("deployment_id = ?", deployment.ID).Delete(&model.DeploymentEnvOverride{})
+		tx.Where("deployment_id = ?", deployment.ID).Delete(&model.DeploymentSecretOverride{})
+		tx.Where("deployment_id = ?", deployment.ID).Delete(&model.DeploymentNetwork{})
 		return tx.Delete(&deployment).Error
 	})
 }

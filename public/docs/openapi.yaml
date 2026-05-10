@@ -12,6 +12,8 @@ tags:
   - name: projects
   - name: services
   - name: volumes
+  - name: networks
+  - name: secrets
   - name: deployments
   - name: docker
 
@@ -179,6 +181,91 @@ paths:
       responses:
         "204":
           description: Volume supprimé
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{id}/networks:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [networks]
+      summary: Ajouter un réseau à un projet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNetworkRequest"
+      responses:
+        "201":
+          description: Réseau créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Network"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{id}/networks/{nid}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: nid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [networks]
+      summary: Supprimer un réseau
+      responses:
+        "204":
+          description: Réseau supprimé
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{id}/secrets:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [secrets]
+      summary: Ajouter un secret à un projet
+      description: La valeur du secret n'est jamais retournée dans les réponses API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSecretRequest"
+      responses:
+        "201":
+          description: Secret créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Secret"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{id}/secrets/{sid}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [secrets]
+      summary: Supprimer un secret
+      responses:
+        "204":
+          description: Secret supprimé
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -473,6 +560,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Volume"
+        networks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Network"
+        secrets:
+          type: array
+          description: Liste des secrets du projet (valeurs masquées).
+          items:
+            $ref: "#/components/schemas/Secret"
 
     CreateProjectRequest:
       type: object
@@ -517,6 +613,21 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EnvVar"
+        labels:
+          type: array
+          description: Labels Docker appliqués aux conteneurs au déploiement (ex. Traefik routing).
+          items:
+            $ref: "#/components/schemas/Label"
+        secrets:
+          type: array
+          description: Noms des secrets du projet à injecter comme variables d'environnement.
+          items:
+            type: string
+        networks:
+          type: array
+          description: Noms des réseaux du projet auxquels ce service doit être connecté.
+          items:
+            type: string
         volume_mounts:
           type: array
           items:
@@ -542,6 +653,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EnvVar"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Label"
+        secrets:
+          type: array
+          items:
+            type: string
+        networks:
+          type: array
+          items:
+            type: string
         volume_mounts:
           type: array
           items:
@@ -566,6 +689,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EnvVar"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Label"
+        secrets:
+          type: array
+          items:
+            type: string
+        networks:
+          type: array
+          items:
+            type: string
         volume_mounts:
           type: array
           items:
@@ -639,6 +774,88 @@ components:
           type: string
           default: local
 
+    Network:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        project_id:
+          type: string
+        name:
+          type: string
+        driver:
+          type: string
+          default: bridge
+
+    CreateNetworkRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        driver:
+          type: string
+          default: bridge
+
+    Secret:
+      type: object
+      description: Déclare un secret requis par l'infrastructure. La valeur est fournie à chaque déploiement via secret_override.
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        project_id:
+          type: string
+        name:
+          type: string
+
+    CreateSecretRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Nom du secret (ex. DB_PASSWORD). La valeur est fournie au moment du déploiement.
+
+    DeploymentSecretOverride:
+      type: object
+      description: Valeur d'un secret pour ce déploiement. La valeur n'est jamais retournée par l'API.
+      properties:
+        id:
+          type: string
+          format: uuid
+        deployment_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+
+    Label:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        service_id:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+
     Deployment:
       type: object
       properties:
@@ -671,10 +888,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DeploymentEnvOverride"
+        secret_override:
+          type: array
+          description: Secrets utilisés pour ce déploiement (noms uniquement, valeurs masquées).
+          items:
+            $ref: "#/components/schemas/DeploymentSecretOverride"
         containers:
           type: array
           items:
             $ref: "#/components/schemas/Container"
+        networks:
+          type: array
+          description: Réseaux Docker créés pour ce déploiement.
+          items:
+            $ref: "#/components/schemas/DeploymentNetwork"
+
+    DeploymentNetwork:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        deployment_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Nom logique du réseau (tel que défini dans le projet)
+        docker_network_id:
+          type: string
+          description: ID du réseau retourné par le Docker Engine
 
     Container:
       type: object
@@ -720,6 +963,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DeploymentEnvOverride"
+        secret_override:
+          type: object
+          additionalProperties:
+            type: string
+          description: |
+            Valeurs des secrets pour ce déploiement (clé = nom du secret, valeur = valeur sensible).
+            Les valeurs ne sont jamais retournées dans les réponses API.
+          example:
+            DB_PASSWORD: "prod_s3cr3t"
+            API_KEY: "sk-abc123"
         scale:
           type: object
           additionalProperties:

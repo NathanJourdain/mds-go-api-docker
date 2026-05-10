@@ -7,8 +7,18 @@ type Service struct {
 	Image        string        `json:"image"              gorm:"not null"`
 	Ports        []PortMapping `json:"ports"              gorm:"serializer:json"`
 	EnvVars      []EnvVar      `json:"env_vars,omitempty" gorm:"foreignKey:ServiceID"`
+	Labels       []Label       `json:"labels,omitempty"   gorm:"foreignKey:ServiceID"`
+	Secrets      []string      `json:"secrets"            gorm:"serializer:json"`
+	Networks     []string      `json:"networks"           gorm:"serializer:json"`
 	VolumeMounts []VolumeMount `json:"volume_mounts"      gorm:"serializer:json"`
 	DependsOn    []string      `json:"depends_on"         gorm:"serializer:json"`
+}
+
+type Label struct {
+	IDModel
+	ServiceID string `json:"service_id" gorm:"not null;index;type:text"`
+	Key       string `json:"key"        gorm:"not null"`
+	Value     string `json:"value"`
 }
 
 type EnvVar struct {
@@ -24,6 +34,9 @@ type CreateServiceRequest struct {
 	Image        string        `json:"image"`
 	Ports        []PortMapping `json:"ports"`
 	EnvVars      []EnvVar      `json:"env_vars"`
+	Labels       []Label       `json:"labels"`
+	Secrets      []string      `json:"secrets"`
+	Networks     []string      `json:"networks"`
 	VolumeMounts []VolumeMount `json:"volume_mounts"`
 	DependsOn    []string      `json:"depends_on"`
 }
@@ -33,6 +46,9 @@ type UpdateServiceRequest struct {
 	Image        *string        `json:"image"`
 	Ports        []PortMapping  `json:"ports"`
 	EnvVars      *[]EnvVar      `json:"env_vars"`
+	Labels       *[]Label       `json:"labels"`
+	Secrets      []string       `json:"secrets"`
+	Networks     []string       `json:"networks"`
 	VolumeMounts []VolumeMount  `json:"volume_mounts"`
 	DependsOn    []string       `json:"depends_on"`
 }

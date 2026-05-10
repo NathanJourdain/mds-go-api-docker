@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
+	dockernetwork "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	gossh "golang.org/x/crypto/ssh"
@@ -22,11 +23,13 @@ type DockerService struct {
 }
 
 type ContainerConfig struct {
-	Name    string
-	Image   string
-	Env     []string
-	Ports   []model.PortMapping
-	Volumes []model.VolumeMount
+	Name     string
+	Image    string
+	Env      []string
+	Ports    []model.PortMapping
+	Volumes  []model.VolumeMount
+	Labels   map[string]string
+	Networks []string
 }
 
 func NewDockerService() (*DockerService, error) {
@@ -103,6 +106,21 @@ func (s *DockerService) PullImage(ctx context.Context, imageName string) error {
 	return err
 }
 
+func (s *DockerService) CreateNetwork(ctx context.Context, name, driver string) (string, error) {
+	if driver == "" {
+		driver = "bridge"
+	}
+	resp, err := s.cli.NetworkCreate(ctx, name, dockernetwork.CreateOptions{Driver: driver})
+	if err != nil {
+		return "", err
+	}
+	return resp.ID, nil
+}
+
+func (s *DockerService) RemoveNetwork(ctx context.Context, dockerNetworkID string) error {
+	return s.cli.NetworkRemove(ctx, dockerNetworkID)
+}
+
 func (s *DockerService) CreateAndStartContainer(ctx context.Context, cfg ContainerConfig) (string, error) {
 	portBindings := nat.PortMap{}
 	exposedPorts := nat.PortSet{}
@@ -131,6 +149,7 @@ func (s *DockerService) CreateAndStartContainer(ctx context.Context, cfg Contain
 			Image:        cfg.Image,
 			Env:          cfg.Env,
 			ExposedPorts: exposedPorts,
+			Labels:       cfg.Labels,
 		},
 		&container.HostConfig{
 			PortBindings: portBindings,
@@ -141,6 +160,12 @@ func (s *DockerService) CreateAndStartContainer(ctx context.Context, cfg Contain
 	)
 	if err != nil {
 		return "", err
+	}
+
+	for _, networkID := range cfg.Networks {
+		if err := s.cli.NetworkConnect(ctx, networkID, resp.ID, &dockernetwork.EndpointSettings{}); err != nil {
+			return "", fmt.Errorf("connect to network %s: %w", networkID, err)
+		}
 	}
 
 	if err := s.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
