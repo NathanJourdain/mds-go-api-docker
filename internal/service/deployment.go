@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"mds-go-api-docker/internal/model"
@@ -94,26 +95,40 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 			return nil, fmt.Errorf("pull %s: %w", svc.Image, err)
 		}
 
-		dockerID, err := docker.CreateAndStartContainer(ctx, ContainerConfig{
-			Name:    fmt.Sprintf("%s_%s", deployment.Name, svc.Name),
-			Image:   svc.Image,
-			Env:     mergeEnv(svc.EnvVars, overrides),
-			Ports:   svc.Ports,
-			Volumes: svc.VolumeMounts,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("start %s: %w", svc.Name, err)
+		replicas := 1
+		if n, ok := req.Scale[svc.Name]; ok && n > 1 {
+			replicas = n
 		}
 
-		c := model.Container{
-			DeploymentID: deployment.ID,
-			ServiceID:    svc.ID,
-			DockerID:     dockerID,
-			Name:         fmt.Sprintf("%s_%s", deployment.Name, svc.Name),
-			Ports:        svc.Ports,
-		}
-		if err := s.deployRepo.SaveContainer(&c); err != nil {
-			return nil, err
+		env := mergeEnv(svc.EnvVars, overrides)
+
+		for i := range replicas {
+			replicaIdx := i + 1
+			ports := scalePorts(svc.Ports, i)
+			name := fmt.Sprintf("%s_%s_%d", deployment.Name, svc.Name, replicaIdx)
+
+			dockerID, err := docker.CreateAndStartContainer(ctx, ContainerConfig{
+				Name:    name,
+				Image:   svc.Image,
+				Env:     env,
+				Ports:   ports,
+				Volumes: svc.VolumeMounts,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("start %s replica %d: %w", svc.Name, replicaIdx, err)
+			}
+
+			c := model.Container{
+				DeploymentID: deployment.ID,
+				ServiceID:    svc.ID,
+				DockerID:     dockerID,
+				Name:         name,
+				ReplicaIndex: replicaIdx,
+				Ports:        ports,
+			}
+			if err := s.deployRepo.SaveContainer(&c); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -205,6 +220,21 @@ func (s *DeploymentService) Stop(ctx context.Context, id string) error {
 		docker.StopAndRemoveContainer(ctx, c.DockerID) //nolint:errcheck
 	}
 	return s.deployRepo.Delete(id)
+}
+
+func scalePorts(ports []model.PortMapping, offset int) []model.PortMapping {
+	if offset == 0 {
+		return ports
+	}
+	result := make([]model.PortMapping, len(ports))
+	for i, p := range ports {
+		host := p.Host
+		if n, err := strconv.Atoi(p.Host); err == nil {
+			host = strconv.Itoa(n + offset)
+		}
+		result[i] = model.PortMapping{Host: host, Container: p.Container, Protocol: p.Protocol}
+	}
+	return result
 }
 
 func mergeEnv(envVars []model.EnvVar, overrides map[string]string) []string {

@@ -25,4 +25,5 @@ type CreateDeploymentRequest struct {
 	Name        string                  `json:"name"`
 	ServerID    *string                 `json:"server_id"`
 	EnvOverride []DeploymentEnvOverride `json:"env_override"`
+	Scale       map[string]int          `json:"scale"`
 }

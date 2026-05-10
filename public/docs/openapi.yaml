@@ -674,7 +674,36 @@ components:
         containers:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/Container"
+
+    Container:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        deployment_id:
+          type: string
+          format: uuid
+        service_id:
+          type: string
+          format: uuid
+        docker_id:
+          type: string
+          description: ID du conteneur retourné par le Docker Engine
+        name:
+          type: string
+        replica_index:
+          type: integer
+          minimum: 1
+          description: Numéro de replica (commence à 1)
+        status:
+          type: string
+          description: État calculé dynamiquement via le Docker Engine (running, exited, unknown…)
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortMapping"
 
     CreateDeploymentRequest:
       type: object
@@ -691,6 +720,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DeploymentEnvOverride"
+        scale:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 1
+          description: |
+            Nombre de replicas par service (clé = nom du service, valeur = nombre d'instances).
+            Si absent ou non spécifié pour un service, 1 replica est créé.
+            Les ports hôte sont décalés automatiquement pour chaque replica supplémentaire.
+          example:
+            api: 3
+            worker: 2
 
     DeploymentEnvOverride:
       type: object

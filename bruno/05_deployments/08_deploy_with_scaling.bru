@@ -1,7 +1,7 @@
 meta {
-  name: Deploy project
+  name: Deploy project with scaling
   type: http
-  seq: 1
+  seq: 8
 }
 
 post {
@@ -12,10 +12,10 @@ post {
 
 body:json {
   {
-    "name": "v1",
-    "server_id": "{{serverId}}",
-    "env_override": [],
-    "scale": {}
+    "name": "v1-scaled",
+    "scale": {
+      "web": 2
+    }
   }
 }
 
