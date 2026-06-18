@@ -14,7 +14,7 @@ info:
     Toute requête sans clé valide retourne `401 Unauthorized`.
 
 servers:
-  - url: https://api.mds-go-api-docker.orb.local/api/v1
+  - url: "__API_URL__/api/v1"
 
 security:
   - ApiKeyAuth: []

@@ -4,6 +4,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -45,16 +46,26 @@ func main() {
 
 	router.Setup(app, db)
 
+	app.Get("/docs/openapi.yaml", func(c *fiber.Ctx) error {
+		spec, err := os.ReadFile("./public/docs/openapi.yaml")
+		if err != nil {
+			return err
+		}
+		apiURL := os.Getenv("API_URL")
+		if apiURL == "" {
+			apiURL = "http://localhost:3000"
+		}
+		c.Set(fiber.HeaderContentType, "application/yaml")
+		return c.SendString(strings.ReplaceAll(string(spec), "__API_URL__", apiURL))
+	})
+
 	app.Static("/", "./public")
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3000"
-	}
+	const port = "3000"
 
 	slog.Info("server starting", "port", port)
 	log.Fatal(app.Listen(":" + port))
