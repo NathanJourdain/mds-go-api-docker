@@ -4,3 +4,5 @@ app.db
 .git/
 *.md
 *.pdf
+bruno/
+.github/workflows/

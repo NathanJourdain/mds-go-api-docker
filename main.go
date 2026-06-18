@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"mds-go-api-docker/internal/database"
 	"mds-go-api-docker/internal/middleware"
@@ -31,6 +32,7 @@ func main() {
 		AppName: "mds-go-api",
 	})
 
+	app.Use(cors.New(cors.Config{AllowOrigins: "*"}))
 	app.Use(recover.New())
 	app.Use(middleware.RequestID())
 	app.Use(middleware.Logger())
