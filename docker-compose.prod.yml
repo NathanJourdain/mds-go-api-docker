@@ -1,0 +1,16 @@
+services:
+  api:
+    image: ghcr.io/nathanjourdain/mds-go-api-docker:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file: .env
+    environment:
+      DATABASE_URL: /data/app.db
+      API_KEY: ${API_KEY}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - db_data:/data
+
+volumes:
+  db_data:
