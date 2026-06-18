@@ -69,7 +69,7 @@ func NewDockerServiceForServer(server model.Server) (*DockerService, error) {
 		client.WithAPIVersionNegotiation(),
 	)
 	if err != nil {
-		sshCli.Close()
+		_ = sshCli.Close()
 		return nil, err
 	}
 
@@ -77,9 +77,9 @@ func NewDockerServiceForServer(server model.Server) (*DockerService, error) {
 }
 
 func (s *DockerService) Close() {
-	s.cli.Close()
+	_ = s.cli.Close()
 	if s.sshClient != nil {
-		s.sshClient.Close()
+		_ = s.sshClient.Close()
 	}
 }
 
@@ -101,7 +101,7 @@ func (s *DockerService) PullImage(ctx context.Context, imageName string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	_, err = io.Copy(io.Discard, out)
 	return err
 }
