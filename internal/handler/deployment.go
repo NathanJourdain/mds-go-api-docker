@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"errors"
 
+	"mds-go-api-docker/internal/logger"
 	"mds-go-api-docker/internal/model"
 	"mds-go-api-docker/internal/repository"
 	"mds-go-api-docker/internal/service"
@@ -18,6 +20,13 @@ func NewDeploymentHandler(svc *service.DeploymentService) *DeploymentHandler {
 	return &DeploymentHandler{svc: svc}
 }
 
+// contextWithRequestID enriches the Fiber request context with the request ID
+// so the service layer can include it in structured log fields.
+func contextWithRequestID(c *fiber.Ctx) context.Context {
+	id, _ := c.Locals("requestid").(string)
+	return logger.ContextWithRequestID(c.Context(), id)
+}
+
 func (h *DeploymentHandler) Deploy(c *fiber.Ctx) error {
 	var req model.CreateDeploymentRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -27,7 +36,7 @@ func (h *DeploymentHandler) Deploy(c *fiber.Ctx) error {
 		return badRequest(c, "name is required")
 	}
 
-	deployment, err := h.svc.Deploy(c.Context(), c.Params("id"), req)
+	deployment, err := h.svc.Deploy(contextWithRequestID(c), c.Params("id"), req)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
@@ -46,7 +55,7 @@ func (h *DeploymentHandler) ListByProject(c *fiber.Ctx) error {
 }
 
 func (h *DeploymentHandler) GetByID(c *fiber.Ctx) error {
-	deployment, err := h.svc.GetWithStatus(c.Context(), c.Params("id"))
+	deployment, err := h.svc.GetWithStatus(contextWithRequestID(c), c.Params("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
@@ -57,7 +66,7 @@ func (h *DeploymentHandler) GetByID(c *fiber.Ctx) error {
 }
 
 func (h *DeploymentHandler) Start(c *fiber.Ctx) error {
-	deployment, err := h.svc.StartContainers(c.Context(), c.Params("id"))
+	deployment, err := h.svc.StartContainers(contextWithRequestID(c), c.Params("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
@@ -68,7 +77,7 @@ func (h *DeploymentHandler) Start(c *fiber.Ctx) error {
 }
 
 func (h *DeploymentHandler) Stop(c *fiber.Ctx) error {
-	deployment, err := h.svc.StopContainers(c.Context(), c.Params("id"))
+	deployment, err := h.svc.StopContainers(contextWithRequestID(c), c.Params("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
@@ -79,7 +88,7 @@ func (h *DeploymentHandler) Stop(c *fiber.Ctx) error {
 }
 
 func (h *DeploymentHandler) Restart(c *fiber.Ctx) error {
-	deployment, err := h.svc.RestartContainers(c.Context(), c.Params("id"))
+	deployment, err := h.svc.RestartContainers(contextWithRequestID(c), c.Params("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
@@ -90,7 +99,7 @@ func (h *DeploymentHandler) Restart(c *fiber.Ctx) error {
 }
 
 func (h *DeploymentHandler) Delete(c *fiber.Ctx) error {
-	if err := h.svc.Stop(c.Context(), c.Params("id")); err != nil {
+	if err := h.svc.Stop(contextWithRequestID(c), c.Params("id")); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return notFound(c)
 		}

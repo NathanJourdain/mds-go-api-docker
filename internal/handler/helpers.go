@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log/slog"
+	applogger "mds-go-api-docker/internal/logger"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -15,8 +15,8 @@ func badRequest(c *fiber.Ctx, msg string) error {
 }
 
 func internalError(c *fiber.Ctx, err error) error {
-	slog.Error("internal error",
-		"request_id", c.GetRespHeader("X-Request-Id"),
+	applogger.App.Error("internal error",
+		"request_id", c.Locals("requestid"),
 		"method", c.Method(),
 		"path", c.Path(),
 		"error", err.Error(),

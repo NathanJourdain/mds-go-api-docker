@@ -1,23 +1,27 @@
 package main
 
 import (
-	"log"
 	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"mds-go-api-docker/internal/database"
+	applogger "mds-go-api-docker/internal/logger"
 	"mds-go-api-docker/internal/middleware"
 	"mds-go-api-docker/internal/router"
 )
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})))
+	level := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "DEBUG" {
+		level = slog.LevelDebug
+	}
+	applogger.Init(level)
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -26,8 +30,10 @@ func main() {
 
 	db, err := database.New(dsn)
 	if err != nil {
-		log.Fatalf("database: %v", err)
+		applogger.App.Error("database connection failed", "error", err)
+		os.Exit(1)
 	}
+	applogger.App.Info("database connected", "dsn", dsn)
 
 	app := fiber.New(fiber.Config{
 		AppName: "mds-go-api",
@@ -40,7 +46,8 @@ func main() {
 
 	apiKey := os.Getenv("API_KEY")
 	if apiKey == "" {
-		log.Fatal("API_KEY environment variable is required")
+		applogger.App.Error("API_KEY environment variable is required")
+		os.Exit(1)
 	}
 	app.Use(middleware.APIKey(apiKey))
 
@@ -66,7 +73,17 @@ func main() {
 	})
 
 	const port = "3000"
+	applogger.App.Info("server starting", "port", port)
 
-	slog.Info("server starting", "port", port)
-	log.Fatal(app.Listen(":" + port))
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-quit
+		applogger.App.Info("shutdown signal received", "signal", sig.String())
+		_ = app.Shutdown()
+	}()
+
+	if err := app.Listen(":" + port); err != nil {
+		applogger.App.Error("server stopped", "error", err)
+	}
 }

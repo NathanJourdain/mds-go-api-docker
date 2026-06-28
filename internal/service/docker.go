@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 
+	applogger "mds-go-api-docker/internal/logger"
 	"mds-go-api-docker/internal/model"
 
 	"github.com/docker/docker/api/types/container"
@@ -45,6 +46,12 @@ func NewDockerServiceForServer(server model.Server) (*DockerService, error) {
 		return NewDockerService()
 	}
 
+	applogger.Docker.Debug("establishing SSH tunnel to Docker",
+		"host", server.Host,
+		"port", server.Port,
+		"user", server.User,
+	)
+
 	signer, err := gossh.ParsePrivateKey([]byte(server.PrivateKey))
 	if err != nil {
 		return nil, fmt.Errorf("parse private key: %w", err)
@@ -59,6 +66,7 @@ func NewDockerServiceForServer(server model.Server) (*DockerService, error) {
 	addr := fmt.Sprintf("%s:%d", server.Host, server.Port)
 	sshCli, err := gossh.Dial("tcp", addr, sshConfig)
 	if err != nil {
+		applogger.Docker.Error("SSH dial failed", "addr", addr, "error", err)
 		return nil, fmt.Errorf("ssh dial %s: %w", addr, err)
 	}
 
@@ -73,6 +81,7 @@ func NewDockerServiceForServer(server model.Server) (*DockerService, error) {
 		return nil, err
 	}
 
+	applogger.Docker.Info("SSH+Docker connection established", "host", server.Host)
 	return &DockerService{cli: cli, sshClient: sshCli}, nil
 }
 
@@ -97,31 +106,47 @@ func (s *DockerService) GetImage(ctx context.Context, imageID string) (image.Ins
 }
 
 func (s *DockerService) PullImage(ctx context.Context, imageName string) error {
+	applogger.Docker.Info("pulling image", "image", imageName)
 	out, err := s.cli.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
+		applogger.Docker.Error("image pull failed", "image", imageName, "error", err)
 		return err
 	}
 	defer func() { _ = out.Close() }()
-	_, err = io.Copy(io.Discard, out)
-	return err
+	if _, err = io.Copy(io.Discard, out); err != nil {
+		applogger.Docker.Error("image pull stream error", "image", imageName, "error", err)
+		return err
+	}
+	applogger.Docker.Info("image ready", "image", imageName)
+	return nil
 }
 
 func (s *DockerService) CreateNetwork(ctx context.Context, name, driver string) (string, error) {
 	if driver == "" {
 		driver = "bridge"
 	}
+	applogger.Docker.Debug("creating Docker network", "name", name, "driver", driver)
 	resp, err := s.cli.NetworkCreate(ctx, name, dockernetwork.CreateOptions{Driver: driver})
 	if err != nil {
+		applogger.Docker.Error("network create failed", "name", name, "error", err)
 		return "", err
 	}
+	applogger.Docker.Info("network created", "name", name, "docker_network_id", resp.ID)
 	return resp.ID, nil
 }
 
 func (s *DockerService) RemoveNetwork(ctx context.Context, dockerNetworkID string) error {
-	return s.cli.NetworkRemove(ctx, dockerNetworkID)
+	applogger.Docker.Info("removing network", "docker_network_id", dockerNetworkID)
+	err := s.cli.NetworkRemove(ctx, dockerNetworkID)
+	if err != nil {
+		applogger.Docker.Warn("network remove failed", "docker_network_id", dockerNetworkID, "error", err)
+	}
+	return err
 }
 
 func (s *DockerService) CreateAndStartContainer(ctx context.Context, cfg ContainerConfig) (string, error) {
+	applogger.Docker.Debug("creating container", "name", cfg.Name, "image", cfg.Image)
+
 	portBindings := nat.PortMap{}
 	exposedPorts := nat.PortSet{}
 	for _, p := range cfg.Ports {
@@ -159,6 +184,7 @@ func (s *DockerService) CreateAndStartContainer(ctx context.Context, cfg Contain
 		cfg.Name,
 	)
 	if err != nil {
+		applogger.Docker.Error("container create failed", "name", cfg.Name, "image", cfg.Image, "error", err)
 		return "", err
 	}
 
@@ -169,9 +195,11 @@ func (s *DockerService) CreateAndStartContainer(ctx context.Context, cfg Contain
 	}
 
 	if err := s.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		applogger.Docker.Error("container start failed", "name", cfg.Name, "docker_id", resp.ID, "error", err)
 		return "", err
 	}
 
+	applogger.Docker.Info("container running", "name", cfg.Name, "image", cfg.Image, "docker_id", resp.ID)
 	return resp.ID, nil
 }
 
@@ -184,22 +212,27 @@ func (s *DockerService) ContainerStatus(ctx context.Context, dockerID string) (c
 }
 
 func (s *DockerService) StartContainer(ctx context.Context, dockerID string) error {
+	applogger.Docker.Info("starting container", "docker_id", dockerID)
 	return s.cli.ContainerStart(ctx, dockerID, container.StartOptions{})
 }
 
 func (s *DockerService) StopContainer(ctx context.Context, dockerID string) error {
+	applogger.Docker.Info("stopping container", "docker_id", dockerID)
 	timeout := 10
 	return s.cli.ContainerStop(ctx, dockerID, container.StopOptions{Timeout: &timeout})
 }
 
 func (s *DockerService) RestartContainer(ctx context.Context, dockerID string) error {
+	applogger.Docker.Info("restarting container", "docker_id", dockerID)
 	timeout := 10
 	return s.cli.ContainerRestart(ctx, dockerID, container.StopOptions{Timeout: &timeout})
 }
 
 func (s *DockerService) StopAndRemoveContainer(ctx context.Context, dockerID string) error {
+	applogger.Docker.Info("stopping and removing container", "docker_id", dockerID)
 	timeout := 10
 	if err := s.cli.ContainerStop(ctx, dockerID, container.StopOptions{Timeout: &timeout}); err != nil {
+		applogger.Docker.Warn("container stop error (proceeding with remove)", "docker_id", dockerID, "error", err)
 		return err
 	}
 	return s.cli.ContainerRemove(ctx, dockerID, container.RemoveOptions{Force: true})

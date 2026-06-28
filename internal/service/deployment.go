@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	applogger "mds-go-api-docker/internal/logger"
 	"mds-go-api-docker/internal/model"
 	"mds-go-api-docker/internal/repository"
 )
@@ -73,8 +74,16 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 		return nil, err
 	}
 
+	log := applogger.Docker.With(
+		"request_id", applogger.RequestIDFromContext(ctx),
+		"deployment_id", deployment.ID,
+		"project_id", projectID,
+	)
+	log.Info("deployment started", "name", req.Name)
+
 	docker, err := s.dockerForDeployment(deployment)
 	if err != nil {
+		log.Error("docker connect failed", "error", err)
 		return nil, err
 	}
 	defer docker.Close()
@@ -96,6 +105,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 		if err := s.deployRepo.SaveNetwork(&dn); err != nil {
 			return nil, err
 		}
+		log.Info("network provisioned", "network_name", n.Name, "docker_network_id", dockerNetworkID)
 	}
 
 	// Build env overrides and secrets maps
@@ -115,6 +125,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 
 	now := time.Now()
 	for _, svc := range sorted {
+		log.Info("pulling image", "image", svc.Image, "service", svc.Name)
 		if err := docker.PullImage(ctx, svc.Image); err != nil {
 			return nil, fmt.Errorf("pull %s: %w", svc.Image, err)
 		}
@@ -156,8 +167,11 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 				Networks: networkIDs,
 			})
 			if err != nil {
+				log.Error("container start failed", "service", svc.Name, "replica", replicaIdx, "error", err)
 				return nil, fmt.Errorf("start %s replica %d: %w", svc.Name, replicaIdx, err)
 			}
+
+			log.Info("container started", "service", svc.Name, "replica", replicaIdx, "name", name, "docker_id", dockerID)
 
 			c := model.Container{
 				DeploymentID: deployment.ID,
@@ -179,6 +193,8 @@ func (s *DeploymentService) Deploy(ctx context.Context, projectID string, req mo
 	if err != nil {
 		return nil, err
 	}
+
+	log.Info("deployment complete", "container_count", len(deployment.Containers))
 	return s.applyStatus(ctx, deployment, docker)
 }
 
@@ -209,9 +225,16 @@ func (s *DeploymentService) StartContainers(ctx context.Context, id string) (*mo
 		return nil, err
 	}
 	defer docker.Close()
+
+	applogger.Docker.Info("starting containers",
+		"request_id", applogger.RequestIDFromContext(ctx),
+		"deployment_id", id,
+		"count", len(deployment.Containers),
+	)
 	for _, c := range deployment.Containers {
 		docker.StartContainer(ctx, c.DockerID) //nolint:errcheck
 	}
+	applogger.Docker.Info("containers started", "deployment_id", id)
 	return s.applyStatus(ctx, deployment, docker)
 }
 
@@ -225,9 +248,16 @@ func (s *DeploymentService) StopContainers(ctx context.Context, id string) (*mod
 		return nil, err
 	}
 	defer docker.Close()
+
+	applogger.Docker.Info("stopping containers",
+		"request_id", applogger.RequestIDFromContext(ctx),
+		"deployment_id", id,
+		"count", len(deployment.Containers),
+	)
 	for _, c := range deployment.Containers {
 		docker.StopContainer(ctx, c.DockerID) //nolint:errcheck
 	}
+	applogger.Docker.Info("containers stopped", "deployment_id", id)
 	return s.applyStatus(ctx, deployment, docker)
 }
 
@@ -241,9 +271,16 @@ func (s *DeploymentService) RestartContainers(ctx context.Context, id string) (*
 		return nil, err
 	}
 	defer docker.Close()
+
+	applogger.Docker.Info("restarting containers",
+		"request_id", applogger.RequestIDFromContext(ctx),
+		"deployment_id", id,
+		"count", len(deployment.Containers),
+	)
 	for _, c := range deployment.Containers {
 		docker.RestartContainer(ctx, c.DockerID) //nolint:errcheck
 	}
+	applogger.Docker.Info("containers restarted", "deployment_id", id)
 	return s.applyStatus(ctx, deployment, docker)
 }
 
@@ -257,12 +294,20 @@ func (s *DeploymentService) Stop(ctx context.Context, id string) error {
 		return err
 	}
 	defer docker.Close()
+
+	applogger.Docker.Info("tearing down deployment",
+		"request_id", applogger.RequestIDFromContext(ctx),
+		"deployment_id", id,
+		"container_count", len(deployment.Containers),
+		"network_count", len(deployment.Networks),
+	)
 	for _, c := range deployment.Containers {
 		docker.StopAndRemoveContainer(ctx, c.DockerID) //nolint:errcheck
 	}
 	for _, n := range deployment.Networks {
 		docker.RemoveNetwork(ctx, n.DockerNetworkID) //nolint:errcheck
 	}
+	applogger.Docker.Info("deployment removed", "deployment_id", id)
 	return s.deployRepo.Delete(id)
 }
 
